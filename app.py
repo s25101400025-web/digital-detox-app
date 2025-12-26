@@ -13,7 +13,7 @@ if 'sabori_count' not in st.session_state:
 if 'history' not in st.session_state:
     st.session_state.history = []
 if 'target_minutes' not in st.session_state:
-    st.session_state.target_minutes = 3  # デフォルトは3分
+    st.session_state.target_minutes = 3
 
 # --- JavaScriptでサボり検知 ---
 st.components.v1.html(f"""
@@ -33,6 +33,7 @@ st.markdown("""
     .stApp { background-color: #0e1117 !important; color: #ffffff; }
     .sabori-text { color: #ff4b4b; font-size: 24px; font-weight: bold; text-align: center; }
     .timer-font { font-size: 100px !important; font-weight: bold; text-align: center; color: #ff4b4b; }
+    .stButton>button { width: 100%; border-radius: 20px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -44,18 +45,17 @@ if st.session_state.page == 'input':
     if st.button("現実を見る"):
         total_loss = usage * 100
         st.error(f"⚠️ 警告：入試までの残り100日で、合計 {total_loss} 時間を失う可能性があります。")
-        st.write(f"これは過去問 {int(total_loss/2)} 年分に相当します。")
     
     st.markdown("---")
     st.subheader("⏱ 集中タイマー設定")
-    # 1分から180分（3時間）まで選べるスライダーを追加
     st.session_state.target_minutes = st.select_slider(
-        "何分間集中しますか？（1分〜3時間）",
+        "何分間集中しますか？",
         options=[1, 3, 5, 10, 15, 20, 25, 30, 45, 60, 90, 120, 150, 180],
         value=3
     )
     
     if st.button(f"{st.session_state.target_minutes}分間の集中を開始する"):
+        st.session_state.sabori_count = 0 # カウントをリセット
         st.session_state.page = 'timer'
         st.rerun()
 
@@ -66,18 +66,16 @@ elif st.session_state.page == 'timer':
     
     timer_placeholder = st.empty()
     
-    # 設定された「分」を「秒」に変換してカウントダウン
+    # 中断ボタン
+    if st.button("集中を中断してホームに戻る"):
+        st.session_state.page = 'input'
+        st.rerun()
+
     total_seconds = st.session_state.target_minutes * 60
-    
     for t in range(total_seconds, -1, -1):
         m, s = divmod(t, 60)
-        h, m = divmod(m, 60) # 1時間以上の表示にも対応
-        
-        if h > 0:
-            time_str = f"{h:02d}:{m:02d}:{s:02d}"
-        else:
-            time_str = f"{m:02d}:{s:02d}"
-            
+        h, m = divmod(m, 60)
+        time_str = f"{h:02d}:{m:02d}:{s:02d}" if h > 0 else f"{m:02d}:{s:02d}"
         timer_placeholder.markdown(f"<div class='timer-font'>{time_str}</div>", unsafe_allow_html=True)
         time.sleep(1)
         
@@ -89,19 +87,19 @@ elif st.session_state.page == 'timer':
 elif st.session_state.page == 'result':
     st.balloons()
     st.title("🎉 集中終了！")
-    st.success(f"{st.session_state.target_minutes}分間の儀式が完了しました。")
     
-    # (以下、グラフ表示部分は前回と同じ)
-    st.subheader("📊 今回の集中レポート")
-    st.write(f"サボり回数: {st.session_state.sabori_count}回")
+    st.subheader("📊 集中レポート")
+    st.write(f"今回のサボり回数: {st.session_state.sabori_count}回")
+    
     if st.session_state.history:
         chart_data = pd.DataFrame({
-            '集中回数': range(1, len(st.session_state.history) + 1),
-            'サボり回数': st.session_state.history
+            '回数': range(1, len(st.session_state.history) + 1),
+            'サボり': st.session_state.history
         })
-        st.bar_chart(data=chart_data, x='集中回数', y='サボり回数')
+        st.bar_chart(data=chart_data, x='回数', y='サボり')
 
-    if st.button("設定に戻る"):
+    # ホームに戻るボタン
+    if st.button("🏠 ホーム（設定）に戻る"):
         st.session_state.sabori_count = 0
         st.session_state.page = 'input'
         st.rerun()
