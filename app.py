@@ -3,7 +3,7 @@ import time
 import pandas as pd
 
 # ページ設定
-st.set_page_config(page_title="受験生専用：合格への3分集中", layout="centered")
+st.set_page_config(page_title="受験生専用：合格への集中タイマー", layout="centered")
 
 # セッション状態の初期化
 if 'page' not in st.session_state:
@@ -12,14 +12,14 @@ if 'sabori_count' not in st.session_state:
     st.session_state.sabori_count = 0
 if 'history' not in st.session_state:
     st.session_state.history = []
+if 'target_minutes' not in st.session_state:
+    st.session_state.target_minutes = 3  # デフォルトは3分
 
-# --- JavaScriptでサボりを検知してStreamlitに伝える ---
-# ボタンを押して隠し要素をクリックさせることで、JSからPythonへデータを渡します
+# --- JavaScriptでサボり検知 ---
 st.components.v1.html(f"""
 <script>
     document.addEventListener("visibilitychange", function() {{
         if (!document.hidden) {{
-            // タブに戻ってきたときに警告を出し、親ウィンドウのカウントを増やすリクエストを送る
             alert("⚠️ 警告：他のページを見ていましたね？その数分が合否を分けます。");
             window.parent.postMessage({{type: 'sabori'}}, '*');
         }}
@@ -32,42 +32,55 @@ st.markdown("""
 <style>
     .stApp { background-color: #0e1117 !important; color: #ffffff; }
     .sabori-text { color: #ff4b4b; font-size: 24px; font-weight: bold; text-align: center; }
+    .timer-font { font-size: 100px !important; font-weight: bold; text-align: center; color: #ff4b4b; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- 1. 診断画面 ---
+# --- 1. 設定・診断画面 ---
 if st.session_state.page == 'input':
     st.title("🎓 受験生用：時間損失計算機")
-    usage = st.slider("1日のついつい見てしまうスマホ時間は？（時間）", 0, 10, 3)
     
+    usage = st.slider("1日のついつい見てしまうスマホ時間は？（時間）", 0, 10, 3)
     if st.button("現実を見る"):
         total_loss = usage * 100
-        st.error(f"⚠️ 入試までの残り100日で、合計 {total_loss} 時間を失う可能性があります。")
-        
-    if st.button("今すぐ3分集中を開始する"):
+        st.error(f"⚠️ 警告：入試までの残り100日で、合計 {total_loss} 時間を失う可能性があります。")
+        st.write(f"これは過去問 {int(total_loss/2)} 年分に相当します。")
+    
+    st.markdown("---")
+    st.subheader("⏱ 集中タイマー設定")
+    # 1分から180分（3時間）まで選べるスライダーを追加
+    st.session_state.target_minutes = st.select_slider(
+        "何分間集中しますか？（1分〜3時間）",
+        options=[1, 3, 5, 10, 15, 20, 25, 30, 45, 60, 90, 120, 150, 180],
+        value=3
+    )
+    
+    if st.button(f"{st.session_state.target_minutes}分間の集中を開始する"):
         st.session_state.page = 'timer'
         st.rerun()
 
 # --- 2. タイマー画面 ---
 elif st.session_state.page == 'timer':
     st.header("🚨 精神統一中 🚨")
-    
-    # サボり回数の表示
     st.markdown(f"<p class='sabori-text'>現在の誘惑に負けた回数: {st.session_state.sabori_count} 回</p>", unsafe_allow_html=True)
     
     timer_placeholder = st.empty()
     
-    # 簡易タイマー（デモ用に180秒）
-    for t in range(180, -1, -1):
+    # 設定された「分」を「秒」に変換してカウントダウン
+    total_seconds = st.session_state.target_minutes * 60
+    
+    for t in range(total_seconds, -1, -1):
         m, s = divmod(t, 60)
-        timer_placeholder.markdown(f"<h1 style='text-align:center; font-size:100px;'>{m:02d}:{s:02d}</h1>", unsafe_allow_html=True)
+        h, m = divmod(m, 60) # 1時間以上の表示にも対応
         
-        # 途中でページが切り替わった際のサボり検知処理（擬似）
-        # 実際にはJSからのメッセージを受け取る仕組みが必要ですが、
-        # ここではシンプルに表示を維持します。
+        if h > 0:
+            time_str = f"{h:02d}:{m:02d}:{s:02d}"
+        else:
+            time_str = f"{m:02d}:{s:02d}"
+            
+        timer_placeholder.markdown(f"<div class='timer-font'>{time_str}</div>", unsafe_allow_html=True)
         time.sleep(1)
         
-    # 終了後の処理
     st.session_state.history.append(st.session_state.sabori_count)
     st.session_state.page = 'result'
     st.rerun()
@@ -76,21 +89,19 @@ elif st.session_state.page == 'timer':
 elif st.session_state.page == 'result':
     st.balloons()
     st.title("🎉 集中終了！")
-    st.success("3分間の儀式が完了しました。")
+    st.success(f"{st.session_state.target_minutes}分間の儀式が完了しました。")
     
+    # (以下、グラフ表示部分は前回と同じ)
     st.subheader("📊 今回の集中レポート")
-    st.write(f"今回のサボり回数: {st.session_state.sabori_count}回")
-    
+    st.write(f"サボり回数: {st.session_state.sabori_count}回")
     if st.session_state.history:
-        st.write("これまでのサボり回数の推移:")
         chart_data = pd.DataFrame({
             '集中回数': range(1, len(st.session_state.history) + 1),
             'サボり回数': st.session_state.history
         })
         st.bar_chart(data=chart_data, x='集中回数', y='サボり回数')
-        
 
-    if st.button("もう一度挑戦してサボりゼロを目指す"):
+    if st.button("設定に戻る"):
         st.session_state.sabori_count = 0
         st.session_state.page = 'input'
         st.rerun()
