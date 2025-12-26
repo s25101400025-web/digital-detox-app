@@ -32,12 +32,12 @@ st.markdown("""
 <style>
     .stApp { background-color: #0e1117 !important; color: #ffffff; }
     .sabori-text { color: #ff4b4b; font-size: 24px; font-weight: bold; text-align: center; }
-    .timer-font { font-size: 100px !important; font-weight: bold; text-align: center; color: #ff4b4b; }
-    .stButton>button { width: 100%; border-radius: 20px; }
+    .timer-font { font-size: 100px !important; font-weight: bold; text-align: center; color: #ff4b4b; margin: 20px 0; }
+    .stButton>button { width: 100%; border-radius: 20px; height: 3em; font-weight: bold; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- 1. 設定・診断画面 ---
+# --- 1. 設定・診断画面（ホーム） ---
 if st.session_state.page == 'input':
     st.title("🎓 受験生用：時間損失計算機")
     
@@ -55,7 +55,7 @@ if st.session_state.page == 'input':
     )
     
     if st.button(f"{st.session_state.target_minutes}分間の集中を開始する"):
-        st.session_state.sabori_count = 0 # カウントをリセット
+        st.session_state.sabori_count = 0
         st.session_state.page = 'timer'
         st.rerun()
 
@@ -64,10 +64,11 @@ elif st.session_state.page == 'timer':
     st.header("🚨 精神統一中 🚨")
     st.markdown(f"<p class='sabori-text'>現在の誘惑に負けた回数: {st.session_state.sabori_count} 回</p>", unsafe_allow_html=True)
     
+    # タイマー表示
     timer_placeholder = st.empty()
     
-    # 中断ボタン
-    if st.button("集中を中断してホームに戻る"):
+    # 中断ボタンをタイマーの上に配置（間違えて押しにくいよう配慮）
+    if st.button("❌ 集中を中断して設定に戻る"):
         st.session_state.page = 'input'
         st.rerun()
 
@@ -88,18 +89,17 @@ elif st.session_state.page == 'result':
     st.balloons()
     st.title("🎉 集中終了！")
     
-    st.subheader("📊 集中レポート")
-    st.write(f"今回のサボり回数: {st.session_state.sabori_count}回")
+    st.subheader("📊 今回の集中レポート")
+    st.metric(label="誘惑に負けた回数", value=f"{st.session_state.sabori_count} 回")
     
     if st.session_state.history:
         chart_data = pd.DataFrame({
-            '回数': range(1, len(st.session_state.history) + 1),
-            'サボり': st.session_state.history
+            '集中回数': range(1, len(st.session_state.history) + 1),
+            'サボり回数': st.session_state.history
         })
-        st.bar_chart(data=chart_data, x='回数', y='サボり')
+        st.bar_chart(data=chart_data, x='集中回数', y='サボり回数')
 
-    # ホームに戻るボタン
-    if st.button("🏠 ホーム（設定）に戻る"):
-        st.session_state.sabori_count = 0
+    st.markdown("---")
+    if st.button("🏠 ホーム（設定画面）に戻る"):
         st.session_state.page = 'input'
         st.rerun()
